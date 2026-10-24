@@ -74,8 +74,13 @@ Deletion is not routine shutdown. Rollback restores a Pod template, not database
 | [8. Recall questions](08-interview-preparation.md) | Explain it without seeing the answer |
 | [9. Command sheet and practice](09-practice-and-revision.md) | Find a command or rehearse the concepts |
 | [10. YAML writing manual](10-kubernetes-yaml-manual.md) | Choose a kind, copy a template, connect fields, and validate |
+| [11. CI/CD platform backlog](11-ci-cd-backlog.md) | Build a reusable GitLab pipeline from commit to Kubernetes deployment and recovery |
 
 **Writing a manifest from scratch?** Open the [YAML manual](10-kubernetes-yaml-manual.md): common fields, annotated templates, nesting rules, and the references that must match.
+
+**Ready to automate delivery?** Work through the [CI/CD platform backlog](11-ci-cd-backlog.md) with GitLab Self-Managed, an external runner, a private registry, and Minikube.
+
+**Learning API communication?** Open the [API notes in the system-design theatre](../learning-system-design/api/README.md), starting with [REST API interview essentials](../learning-system-design/api/rest/README.md): HTTP methods, status codes, design, caching, security, reliability, recall questions, and curl practice. Other communication topics currently have placeholder folders only.
 
 ## Make it stick
 
