@@ -1,6 +1,8 @@
 # 6. Resources and cgroups
 
-[Index](README.md) · Previous: [DNS](05-dns-and-namespaces.md) · Next: [Troubleshooting](07-troubleshooting.md)
+[Index](README.md) · Previous: [DNS](05-dns-and-namespaces.md) · Next: [Configuration and health](12-configuration-and-health.md)
+
+**Goal:** distinguish declared scheduling needs from live usage and runtime enforcement. Prerequisite: a healthy guided workload. First complete the scheduling lab; detailed cgroup inspection below is optional on your first pass. Continue the learning route with [configuration and health](12-configuration-and-health.md).
 
 ## Remember these four things
 
@@ -46,9 +48,9 @@ Requests are not live measurements. They are also not an exclusive core assignme
 **Next-step command:** apply settings to an existing nginx Deployment in your practice namespace:
 
 ```bash
-kubectl set resources deployment/nginx -n demo -c nginx \
+kubectl set resources deployment/nginx -n foundation -c nginx \
   --requests=cpu=250m,memory=256Mi --limits=cpu=500m,memory=512Mi
-kubectl rollout status deployment/nginx -n demo --timeout=120s
+kubectl rollout status deployment/nginx -n foundation --timeout=120s
 ```
 
 This changes the Pod template and triggers a rollout. These are example values, not measured application sizing.
@@ -59,14 +61,41 @@ This changes the Pod template and triggers a rollout. These are example values, 
 | --- | --- | --- |
 | Minikube configuration | What budget did I ask for? | `minikube config view` plus the profile configuration |
 | Capacity / allocatable | What does Kubernetes advertise / offer for Pods? | `kubectl describe node minikube` |
-| Requests / limits | What was declared for workloads? | `kubectl describe pod POD_NAME -n demo` |
-| Actual usage | What is being consumed now? | `kubectl top nodes` / `kubectl top pods -n demo` |
+| Requests / limits | What was declared for workloads? | `kubectl describe pod POD_NAME -n foundation` |
+| Actual usage | What is being consumed now? | `kubectl top nodes` / `kubectl top pods -n foundation` |
 
 `top` needs a working metrics API, usually metrics-server. The allocated-resource table in `describe node` sums requests/limits; it is not live utilization.
 
 Allocatable is node capacity after reservations. With container-based Minikube, the outer container can impose a tighter budget than host-looking node capacity suggests. Both workloads and Kubernetes components consume that outer budget.
 
-## cgroups: inspect the enforcement layer
+## Lab: low usage does not imply scheduling capacity
+
+**Predict:** can an idle node accept a Pod requesting more CPU than the node has? Kubernetes normally schedules using requests, not a guess based on current utilization.
+
+```bash
+kubectl get nodes -o custom-columns=NAME:.metadata.name,CPU:.status.allocatable.cpu,MEMORY:.status.allocatable.memory
+kubectl apply -f labs/kubernetes/unschedulable.yaml
+kubectl get pod too-large -n foundation -o wide
+kubectl describe pod too-large -n foundation
+```
+
+The fixture requests **1000 CPUs**, deliberately excessive for this local lab. Confirm your node has fewer than that. Expect `Pending`, no assigned node, and a scheduling event mentioning insufficient CPU after the scheduler evaluates it. If admission rejects it first due to a quota/LimitRange, that error is evidence of a different boundary; inspect those policies before expecting a scheduler event.
+
+**Recover:** `kubectl delete pod too-large -n foundation`. Then apply the example resources to nginx using the earlier `set resources` command and wait for its rollout. Explain why changing a Pod template replaces Pods. Update saved manifests if you want imperative settings to survive later applies; chapter 12's full stage declares its own explicit example values.
+
+For optional live measurements:
+
+```bash
+minikube addons enable metrics-server
+kubectl top nodes
+kubectl top pods -n foundation
+```
+
+The metrics API may take time to become available. Inspect the metrics-server Pod/logs if it stays unavailable. A tiny nginx request load will not meaningfully demonstrate CPU throttling or OOM; the scheduling lab proves only placement behavior. Do not label declared limits as measured enforcement.
+
+**Checkpoint:** decode `250m` and `256Mi`, explain why an idle node rejected `too-large`, and identify which commands show requests versus actual usage. Continue to [configuration and health](12-configuration-and-health.md).
+
+## Optional second pass: cgroups and the enforcement layer
 
 Your rootful Podman setup has another container boundary around the whole node:
 

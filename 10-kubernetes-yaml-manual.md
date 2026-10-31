@@ -1,5 +1,7 @@
 # 10. Kubernetes YAML: a manual for writing from scratch
 
+This is the field reference for the [learning route](README.md), not a first-pass syllabus. For executable staged manifests use the [lab guide](labs/kubernetes/README.md). Authoring YAML expresses intent; only runtime checks establish that images, references, probes, and storage actually work.
+
 [Index](README.md) · Related: [Workloads](03-workloads-and-rollouts.md), [Networking](04-services-and-networking.md), [Resources](06-resources-and-cgroups.md)
 
 ## Start with these five rules
@@ -33,7 +35,7 @@ One file can contain several objects separated by `---`. Several files can descr
 | `apiVersion` | API group/version for this kind | `v1`, `apps/v1`, `batch/v1`, etc. |
 | `kind` | Object type; case matters | `Deployment`, `Service`, etc. |
 | `metadata.name` | This object's name | A descriptive name such as `nginx` |
-| `metadata.namespace` | Namespace of a namespaced object | `demo`; omit for cluster-scoped kinds |
+| `metadata.namespace` | Namespace of a namespaced object | `foundation`; omit for cluster-scoped kinds |
 | `metadata.labels` | Tags used for grouping/selection | String keys/values such as `app: nginx` |
 | `metadata.annotations` | Extra metadata for people/tools | String values; not the normal selector mechanism |
 | `spec` | Kind-specific desired state | Different structure for each kind |
@@ -64,7 +66,7 @@ Deployment `metadata.labels` does **not** automatically label its Pods. Put Pod 
 
 ## Templates: open only the one you need
 
-Examples use namespace `demo`, application `nginx`, and port 80. Each object is a separate manifest you can save under its suggested filename. Create the namespace first. Referenced configuration/storage must exist before the workload can use it. Image tags and resource values are learning examples; choose appropriate versions/digests and sizing for your own application.
+Examples use namespace `foundation`, application `nginx`, backend port 80, and Service port 8080. Each object is a separate manifest you can save under its suggested filename. Create the namespace first. Referenced configuration/storage must exist before the workload can use it. These templates are independent field examples, not successive lab stages; use the [saved lab files](labs/kubernetes/README.md) for the guided application. Image tags and resource values are teaching examples, not measured application sizing.
 
 ### Namespace
 
@@ -75,7 +77,7 @@ Examples use namespace `demo`, application `nginx`, and port 80. Each object is 
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: demo
+  name: foundation
 ```
 
 Namespace is cluster-scoped: do not give it `metadata.namespace`. A namespace does not automatically isolate network traffic.
@@ -92,7 +94,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: nginx                    # Deployment name
-  namespace: demo
+  namespace: foundation
   labels:
     app: nginx                   # Labels THIS Deployment
 spec:
@@ -150,21 +152,21 @@ apiVersion: v1
 kind: Service
 metadata:
   name: nginx
-  namespace: demo
+  namespace: foundation
 spec:
   type: ClusterIP                # Default; internal access
   selector:
-    app: nginx                   # Matches POD labels in namespace demo
+    app: nginx                   # Matches POD labels in namespace foundation
   ports:
     - name: http
       protocol: TCP
-      port: 80                   # Client calls Service on this port
+      port: 8080                 # Client calls Service on this port
       targetPort: http           # Named container port; numeric 80 also works
 ```
 
 For NodePort, change `type` to `NodePort`. Omit `nodePort` to let the API allocate one; if choosing it explicitly, it must be in the cluster's allowed range and available. `nodePort` belongs inside the `ports` list item, alongside `port` and `targetPort`.
 
-Service name and Deployment name need not match. The **selector** connects them. Changing Service `port` to 8080 would change the client entry port; nginx could still listen on target port 80. See [Services](https://kubernetes.io/docs/concepts/services-networking/service/).
+Service name and Deployment name need not match. The **selector** connects them. Clients use port 8080 while nginx listens on target port 80. See [Services](https://kubernetes.io/docs/concepts/services-networking/service/).
 
 </details>
 
@@ -178,7 +180,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: app-config
-  namespace: demo
+  namespace: foundation
 data:                            # No spec wrapper
   APP_MODE: "development"
   APP_ENABLED: "true"
@@ -201,7 +203,7 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: app-secret
-  namespace: demo
+  namespace: foundation
 type: Opaque
 stringData:                      # Plain strings converted into data by the API
   API_TOKEN: "replace-locally"   # Illustrative placeholder, not a real credential
@@ -223,7 +225,7 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: app-data
-  namespace: demo
+  namespace: foundation
 spec:
   accessModes:
     - ReadWriteOnce
@@ -249,7 +251,7 @@ apiVersion: v1
 kind: Pod
 metadata:
   name: debug
-  namespace: demo
+  namespace: foundation
 spec:                            # No template wrapper for a standalone Pod
   restartPolicy: Never
   containers:
@@ -273,7 +275,7 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: hello-once
-  namespace: demo
+  namespace: foundation
 spec:
   backoffLimit: 2                 # Retry budget before Job failure
   template:
@@ -288,7 +290,7 @@ apiVersion: batch/v1
 kind: CronJob
 metadata:
   name: hello-scheduled
-  namespace: demo
+  namespace: foundation
 spec:
   schedule: "*/5 * * * *"        # Every five minutes; quote the expression
   timeZone: Asia/Kolkata
@@ -476,23 +478,23 @@ kubectl explain deployment.spec --recursive
 ### Generate a starter when a command supports it
 
 ```bash
-kubectl create deployment nginx -n demo --image=nginx:alpine \
+kubectl create deployment nginx -n foundation --image=nginx:alpine \
   --dry-run=client -o yaml > deployment.yaml
-kubectl create namespace demo --dry-run=client -o yaml > namespace.yaml
+kubectl create namespace foundation --dry-run=client -o yaml > namespace.yaml
 ```
 
 These commands write local files and overwrite an existing file at the same path. They do not create those objects in the cluster. Review and edit the generated manifest.
 
 ### Check against the API before saving changes there
 
-Assume namespace `demo` already exists and the referenced files contain your intended objects:
+Assume namespace `foundation` already exists and the referenced files contain your intended objects:
 
 ```bash
 kubectl config current-context
 kubectl apply --dry-run=server --validate=strict -f deployment.yaml
 kubectl diff -f deployment.yaml
 kubectl apply -f deployment.yaml
-kubectl rollout status deployment/nginx -n demo --timeout=120s
+kubectl rollout status deployment/nginx -n foundation --timeout=120s
 ```
 
 Server dry-run validates without persisting the resource. It needs the API and suitable permissions. It does not prove the image can run, references exist, or storage will bind. `diff` normally returns exit code 1 when changes are present. `apply` is the step that changes cluster state.
